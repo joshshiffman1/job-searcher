@@ -33,7 +33,8 @@ jobs:
         run: |
           echo "ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}" >> $GITHUB_ENV
           echo "BOOLEAN_TAVILY_API_KEY=${{ secrets.BOOLEAN_TAVILY_API_KEY }}" >> $GITHUB_ENV
-          echo "SLACK_WEBHOOK_URL=${{ secrets.SLACK_WEBHOOK_URL }}" >> $GITHUB_ENV
+          echo "GMAIL_ADDRESS=${{ secrets.GMAIL_ADDRESS }}" >> $GITHUB_ENV
+          echo "GMAIL_APP_PASSWORD=${{ secrets.GMAIL_APP_PASSWORD }}" >> $GITHUB_ENV
 
       - name: Restore job history cache
         uses: actions/cache@v4
