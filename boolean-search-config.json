@@ -1,9 +1,9 @@
 {
   "_instructions": "Edit the 'string' values with your Boolean queries. Set enabled:false to pause a query without deleting it. See references/boolean-search-patterns.md for ready-to-use query strings by role type.",
   "settings": {
-    "results_per_query": 5,
+    "results_per_query": 10,
     "delay_between_queries_seconds": 2,
-    "days_back": 7
+    "days_back": 14
   },
   "queries": [
     {
@@ -27,13 +27,8 @@
       "string": "(site:greenhouse.io OR site:lever.co) (\"Product Analyst\" OR \"Product Operations Analyst\") (\"New York\" OR \"NYC\" OR \"hybrid\")"
     },
     {
-      "name": "PMM + Product Ops - ICIMS (NYC)",
-      "enabled": false,
-      "string": "site:careers.icims.com (\"Product Marketing Manager\" OR \"Product Operations Manager\") (\"New York\" OR \"NYC\")"
-    },
-    {
       "name": "PMM + Product Ops - Ashby (NYC)",
-      "enabled": false,
+      "enabled": true,
       "string": "site:jobs.ashbyhq.com (\"Product Marketing Manager\" OR \"Product Operations Manager\" OR \"Product Marketing\") (\"New York\" OR \"NYC\" OR \"hybrid\")"
     }
   ]
