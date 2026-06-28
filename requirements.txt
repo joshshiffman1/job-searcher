@@ -1,2 +1,6 @@
 # Required for boolean_search.py (Tavily API calls)
 requests==2.32.3
+
+# Required for update_sheets.py (Google Sheets API)
+google-auth==2.29.0
+google-api-python-client==2.125.0
