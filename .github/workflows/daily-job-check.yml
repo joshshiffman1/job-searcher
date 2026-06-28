@@ -1,5 +1,4 @@
 name: Daily Job Check
-
 on:
   schedule:
     # 8:00 AM EST = 1:00 PM UTC
@@ -8,34 +7,29 @@ on:
     - cron: '0 19 * * *'
     # 8:00 PM EST = 1:00 AM UTC next day
     - cron: '0 1 * * *'
-
   # Manual trigger for testing
   workflow_dispatch:
-
 jobs:
   check-jobs:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
           cache: 'pip'
-
       - name: Install dependencies
         run: pip install -r requirements.txt
-
       - name: Set up environment variables
         run: |
           echo "ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}" >> $GITHUB_ENV
           echo "BOOLEAN_TAVILY_API_KEY=${{ secrets.BOOLEAN_TAVILY_API_KEY }}" >> $GITHUB_ENV
           echo "GMAIL_ADDRESS=${{ secrets.GMAIL_ADDRESS }}" >> $GITHUB_ENV
           echo "GMAIL_APP_PASSWORD=${{ secrets.GMAIL_APP_PASSWORD }}" >> $GITHUB_ENV
-
+          echo "GOOGLE_SERVICE_ACCOUNT_JSON=${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}" >> $GITHUB_ENV
+          echo "SHEET_ID=1hV30I1SdST8ECquhkC48ae0hlL79iQfhR17JZ6X3jJ4" >> $GITHUB_ENV
       - name: Restore job history cache
         uses: actions/cache@v4
         with:
@@ -43,17 +37,24 @@ jobs:
           key: job-history-${{ github.run_id }}
           restore-keys: |
             job-history-
-
       - name: Create output directories
         run: |
           mkdir -p logs
           mkdir -p daily-reports
-
       - name: Run daily job check
         run: |
           chmod +x scripts/daily-job-check.sh
           ./scripts/daily-job-check.sh
-
+      - name: Sync results to Google Sheets
+        if: always()
+        run: |
+          if [ -f "daily-reports/report-$(date +%Y-%m-%d).md" ]; then
+            python scripts/update_sheets.py \
+              --analysis .temp-*/analysis.json \
+              --sheet-id "$SHEET_ID" 2>&1 || echo "Sheets sync failed (non-fatal)"
+          else
+            echo "No report found, skipping Sheets sync"
+          fi
       - name: Upload reports as artifact
         if: always()
         uses: actions/upload-artifact@v4
