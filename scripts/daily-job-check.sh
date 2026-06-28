@@ -20,6 +20,7 @@ REPORT_FILE="$BASE_DIR/daily-reports/report-$DATE.md"
 PROFILE_FILE="$BASE_DIR/my-profile.md"
 TEMP_DIR="$BASE_DIR/.temp-$$"
 JOB_HISTORY_FILE="$BASE_DIR/.job_history.txt"
+SHEET_URL="https://docs.google.com/spreadsheets/d/1hV30I1SdST8ECquhkC48ae0hlL79iQfhR17JZ6X3jJ4/edit"
 
 # ============================================================================
 # HELPER FUNCTIONS
@@ -99,7 +100,6 @@ run_boolean_search() {
         return 0
     fi
 
-    # Use venv Python if available (local), fall back to system python3 (GitHub Actions)
     local python_cmd
     if [ -f "$BASE_DIR/venv/bin/python3" ]; then
         python_cmd="$BASE_DIR/venv/bin/python3"
@@ -229,7 +229,6 @@ EOF
         return 1
     fi
 
-    # Strip markdown code fences if present
     claude_response=$(echo "$claude_response" | sed 's/^```json[[:space:]]*//' | sed 's/^```[[:space:]]*//' | sed 's/[[:space:]]*```$//')
 
     echo "$claude_response" > "$TEMP_DIR/analysis.json"
@@ -240,7 +239,6 @@ EOF
         return 1
     fi
 
-    # Normalize scores (handle rare case where Claude returns 80 instead of 8.0)
     if jq '
         .jobs = (.jobs | map(
             .score = ((.score | tonumber) | if . > 10 then . / 10 else . end)
@@ -411,7 +409,6 @@ send_gmail_notification() {
         return 1
     fi
 
-    # Alert threshold — jobs at or above this score trigger a detailed alert
     local threshold=6.5
 
     local high_score_jobs total_jobs top_score avg_score
@@ -425,16 +422,21 @@ send_gmail_notification() {
     if [ "$high_score_jobs" -eq 0 ]; then
         if [ "$total_jobs" -eq 0 ]; then
             subject="Daily Job Check — No new postings found ($DATE)"
-            email_body="Daily job check complete. No new postings found today."
+            email_body="Daily job check complete. No new postings found today.
+
+View your tracker: $SHEET_URL"
         else
             subject="Daily Job Check — $total_jobs posting(s), none above threshold ($DATE)"
-            email_body="Daily job check complete. Found $total_jobs posting(s), none scored above $threshold/10."
+            email_body="Daily job check complete. Found $total_jobs posting(s), none scored above $threshold/10.
+
+View your tracker: $SHEET_URL"
         fi
     else
         subject="🔥 $high_score_jobs High-Priority Job(s) Found ($DATE)"
 
         email_body="Daily Job Report — $DATE
 Total found: $total_jobs | Top score: $top_score/10 | Avg: $avg_score/10
+View full tracker: $SHEET_URL
 ================================================
 
 HIGH-PRIORITY JOBS (score >= $threshold):
@@ -479,7 +481,6 @@ $qualifications
         done < <(jq -c "[.jobs[] | select(.score >= $threshold)] | sort_by(-.score) | .[]" "$TEMP_DIR/analysis.json")
     fi
 
-    # Send via curl using Gmail SMTP
     local email_file="$TEMP_DIR/email.txt"
     cat > "$email_file" << EOF
 From: $GMAIL_ADDRESS
