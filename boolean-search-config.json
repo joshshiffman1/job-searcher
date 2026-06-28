@@ -7,24 +7,34 @@
   },
   "queries": [
     {
-      "name": "My Role - Greenhouse + Lever (Remote US)",
+      "name": "PMM + Product Ops - Greenhouse + Lever (NYC)",
       "enabled": true,
-      "string": "(site:greenhouse.io OR site:lever.co) (\"your role title\" OR \"senior your role title\") (\"remote\" OR \"remote-first\") (\"US\" OR \"United States\")"
+      "string": "(site:greenhouse.io OR site:lever.co) (\"Product Marketing Manager\" OR \"Product Operations Manager\" OR \"Product Marketing\") (\"New York\" OR \"NYC\" OR \"hybrid\")"
     },
     {
-      "name": "My Role - Workday (Remote)",
+      "name": "PMM + Product Ops - Workday (NYC)",
       "enabled": true,
-      "string": "site:myworkdayjobs.com (\"your role title\" OR \"senior your role title\") (\"remote\" OR \"remote-first\")"
+      "string": "site:myworkdayjobs.com (\"Product Marketing Manager\" OR \"Product Operations Manager\" OR \"Product Marketing\") (\"New York\" OR \"NYC\" OR \"hybrid\")"
     },
     {
-      "name": "My Role - ICIMS (Remote)",
-      "enabled": false,
-      "string": "site:careers.icims.com (\"your role title\" OR \"senior your role title\") (\"remote\")"
+      "name": "PMM + Product Ops - Workable (NYC)",
+      "enabled": true,
+      "string": "site:apply.workable.com (\"Product Marketing Manager\" OR \"Product Operations Manager\" OR \"Product Marketing\") (\"New York\" OR \"NYC\" OR \"hybrid\")"
     },
     {
-      "name": "My Role - Ashby (Remote)",
+      "name": "Product Analyst - Greenhouse + Lever (NYC)",
+      "enabled": true,
+      "string": "(site:greenhouse.io OR site:lever.co) (\"Product Analyst\" OR \"Product Operations Analyst\") (\"New York\" OR \"NYC\" OR \"hybrid\")"
+    },
+    {
+      "name": "PMM + Product Ops - ICIMS (NYC)",
       "enabled": false,
-      "string": "site:jobs.ashbyhq.com (\"your role title\" OR \"senior your role title\") (\"remote\" OR \"remote-first\") (\"US\" OR \"United States\")"
+      "string": "site:careers.icims.com (\"Product Marketing Manager\" OR \"Product Operations Manager\") (\"New York\" OR \"NYC\")"
+    },
+    {
+      "name": "PMM + Product Ops - Ashby (NYC)",
+      "enabled": false,
+      "string": "site:jobs.ashbyhq.com (\"Product Marketing Manager\" OR \"Product Operations Manager\" OR \"Product Marketing\") (\"New York\" OR \"NYC\" OR \"hybrid\")"
     }
   ]
 }
