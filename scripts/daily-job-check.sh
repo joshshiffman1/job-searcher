@@ -3,7 +3,7 @@
 ################################################################################
 # Daily Job Check
 # Searches ATS job boards via Tavily Boolean search, analyzes results with
-# Claude API, and generates ranked reports with optional Slack notifications.
+# Claude API, and generates ranked reports with Gmail notifications.
 ################################################################################
 
 set -euo pipefail
@@ -72,8 +72,8 @@ check_env_vars() {
         missing_vars+=("ANTHROPIC_API_KEY")
     fi
 
-    if [ -z "${SLACK_WEBHOOK_URL:-}" ]; then
-        log "WARNING: SLACK_WEBHOOK_URL not set - notifications disabled"
+    if [ -z "${GMAIL_ADDRESS:-}" ] || [ -z "${GMAIL_APP_PASSWORD:-}" ]; then
+        log "WARNING: GMAIL_ADDRESS or GMAIL_APP_PASSWORD not set - notifications disabled"
     fi
 
     if [ ${#missing_vars[@]} -gt 0 ]; then
@@ -395,16 +395,16 @@ EOF
 }
 
 # ============================================================================
-# SLACK NOTIFICATIONS
+# GMAIL NOTIFICATIONS
 # ============================================================================
 
-send_slack_notification() {
-    if [ -z "${SLACK_WEBHOOK_URL:-}" ]; then
-        log "Slack webhook not configured, skipping notification"
+send_gmail_notification() {
+    if [ -z "${GMAIL_ADDRESS:-}" ] || [ -z "${GMAIL_APP_PASSWORD:-}" ]; then
+        log "Gmail credentials not configured, skipping notification"
         return 0
     fi
 
-    log "Sending Slack notification..."
+    log "Sending Gmail notification..."
 
     if [ ! -f "$TEMP_DIR/analysis.json" ]; then
         error "Analysis file not found for notifications"
@@ -420,114 +420,86 @@ send_slack_notification() {
     top_score=$(jq -r '.summary.top_score' "$TEMP_DIR/analysis.json")
     avg_score=$(jq -r '.summary.avg_score' "$TEMP_DIR/analysis.json")
 
+    local subject email_body
+
     if [ "$high_score_jobs" -eq 0 ]; then
-        local summary_msg
         if [ "$total_jobs" -eq 0 ]; then
-            summary_msg="Daily job check complete. No new postings found."
+            subject="Daily Job Check — No new postings found ($DATE)"
+            email_body="Daily job check complete. No new postings found today."
         else
-            summary_msg="Daily job check complete. Found $total_jobs posting(s), none above the alert threshold."
+            subject="Daily Job Check — $total_jobs posting(s), none above threshold ($DATE)"
+            email_body="Daily job check complete. Found $total_jobs posting(s), none scored above $threshold/10."
         fi
+    else
+        subject="🔥 $high_score_jobs High-Priority Job(s) Found ($DATE)"
 
-        local payload
-        payload=$(jq -n --arg msg "$summary_msg" '{
-            text: $msg
-        }')
+        email_body="Daily Job Report — $DATE
+Total found: $total_jobs | Top score: $top_score/10 | Avg: $avg_score/10
+================================================
 
-        curl -s -X POST "$SLACK_WEBHOOK_URL" \
-            -H "Content-Type: application/json" \
-            -d "$payload" >> "$LOG_FILE" 2>&1
-        log "Summary notification sent"
-        return 0
+HIGH-PRIORITY JOBS (score >= $threshold):
+
+"
+        local job_num=1
+        while IFS= read -r job; do
+            local title company score location salary link qualifications reasoning is_new new_label
+
+            title=$(echo "$job" | jq -r '.title')
+            company=$(echo "$job" | jq -r '.company')
+            score=$(echo "$job" | jq -r '.score')
+            location=$(echo "$job" | jq -r '.location')
+            salary=$(echo "$job" | jq -r '.salary')
+            link=$(echo "$job" | jq -r '.link')
+            qualifications=$(echo "$job" | jq -r '.qualifications // [] | map("  • " + .) | join("\n")')
+            reasoning=$(echo "$job" | jq -r '.reasoning')
+            is_new=$(echo "$job" | jq -r '.is_new // false')
+
+            if [ "$is_new" = "true" ]; then
+                new_label="★ NEW | "
+            else
+                new_label=""
+            fi
+
+            if [ "$salary" = "null" ] || [ -z "$salary" ]; then
+                salary="Not specified"
+            fi
+
+            email_body+="$job_num. ${new_label}${title} at ${company}
+   Score: $score/10
+   Location: $location
+   Salary: $salary
+   Link: $link
+   Key Qualifications:
+$qualifications
+   Why: $reasoning
+
+------------------------------------------------
+"
+            ((job_num++))
+        done < <(jq -c "[.jobs[] | select(.score >= $threshold)] | sort_by(-.score) | .[]" "$TEMP_DIR/analysis.json")
     fi
 
-    log "Found $high_score_jobs high-scoring job(s), sending detailed notification..."
+    # Send via curl using Gmail SMTP
+    local email_file="$TEMP_DIR/email.txt"
+    cat > "$email_file" << EOF
+From: $GMAIL_ADDRESS
+To: $GMAIL_ADDRESS
+Subject: $subject
+Content-Type: text/plain; charset=utf-8
 
-    # Build job blocks for high-scoring postings
-    local job_blocks=""
-    local job_num=1
-
-    while IFS= read -r job; do
-        local title company score location salary link qualifications is_new new_label
-
-        title=$(echo "$job" | jq -r '.title' | sed 's/"/\\"/g')
-        company=$(echo "$job" | jq -r '.company' | sed 's/"/\\"/g')
-        score=$(echo "$job" | jq -r '.score')
-        location=$(echo "$job" | jq -r '.location' | sed 's/"/\\"/g')
-        salary=$(echo "$job" | jq -r '.salary')
-        link=$(echo "$job" | jq -r '.link')
-        qualifications=$(echo "$job" | jq -r '.qualifications // [] | map("• " + .) | join("\\n")')
-        is_new=$(echo "$job" | jq -r '.is_new // false')
-
-        if [ "$is_new" = "true" ]; then
-            new_label="NEW | "
-        else
-            new_label=""
-        fi
-
-        if [ "$salary" = "null" ] || [ -z "$salary" ]; then
-            salary="Not specified"
-        fi
-
-        job_blocks+=$(cat << EOFJOB
-,{
-    "type": "section",
-    "text": {
-        "type": "mrkdwn",
-        "text": "${new_label}*${job_num}. ${title}* at *${company}*\nScore: ${score}/10"
-    }
-},
-{
-    "type": "section",
-    "fields": [
-        {"type": "mrkdwn", "text": "*Location:*\n${location}"},
-        {"type": "mrkdwn", "text": "*Salary:*\n${salary}"}
-    ]
-},
-{
-    "type": "section",
-    "text": {
-        "type": "mrkdwn",
-        "text": "*Qualifications:*\n${qualifications}\n<${link}|View Posting>"
-    }
-},
-{"type": "divider"}
-EOFJOB
-)
-        ((job_num++))
-    done < <(jq -c "[.jobs[] | select(.score >= $threshold)] | sort_by(-.score) | .[]" "$TEMP_DIR/analysis.json")
-
-    local slack_payload
-    slack_payload=$(cat << EOF
-{
-    "text": "$high_score_jobs high-priority job(s) found",
-    "blocks": [
-        {
-            "type": "header",
-            "text": {"type": "plain_text", "text": "$high_score_jobs High-Priority Job(s) Found"}
-        },
-        {
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": "*Total found:* $total_jobs | *Top score:* $top_score/10 | *Avg:* $avg_score/10"
-            }
-        },
-        {"type": "divider"}
-        $job_blocks
-    ]
-}
+$email_body
 EOF
-)
 
-    local slack_response
-    slack_response=$(curl -s -X POST "$SLACK_WEBHOOK_URL" \
-        -H "Content-Type: application/json" \
-        -d "$slack_payload" 2>> "$LOG_FILE")
-
-    if [ "$slack_response" = "ok" ]; then
-        log "Slack notification sent successfully"
+    if curl -s \
+        --url "smtps://smtp.gmail.com:465" \
+        --ssl-reqd \
+        --mail-from "$GMAIL_ADDRESS" \
+        --mail-rcpt "$GMAIL_ADDRESS" \
+        --user "$GMAIL_ADDRESS:$GMAIL_APP_PASSWORD" \
+        --upload-file "$email_file" >> "$LOG_FILE" 2>&1; then
+        log "Gmail notification sent successfully"
     else
-        error "Failed to send Slack notification: $slack_response"
+        error "Failed to send Gmail notification"
         return 1
     fi
 
@@ -567,8 +539,8 @@ main() {
         exit 1
     fi
 
-    if ! send_slack_notification; then
-        log "WARNING: Failed to send Slack notification (continuing)"
+    if ! send_gmail_notification; then
+        log "WARNING: Failed to send Gmail notification (continuing)"
     fi
 
     local total_jobs
