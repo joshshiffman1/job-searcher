@@ -1,3 +1,6 @@
+Here's the full corrected version — just replace the entire file with this:
+
+```yaml
 name: Daily Job Check
 on:
   schedule:
@@ -28,8 +31,10 @@ jobs:
           echo "BOOLEAN_TAVILY_API_KEY=${{ secrets.BOOLEAN_TAVILY_API_KEY }}" >> $GITHUB_ENV
           echo "GMAIL_ADDRESS=${{ secrets.GMAIL_ADDRESS }}" >> $GITHUB_ENV
           echo "GMAIL_APP_PASSWORD=${{ secrets.GMAIL_APP_PASSWORD }}" >> $GITHUB_ENV
-          echo "GOOGLE_SERVICE_ACCOUNT_JSON=${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}" >> $GITHUB_ENV
           echo "SHEET_ID=1hV30I1SdST8ECquhkC48ae0hlL79iQfhR17JZ6X3jJ4" >> $GITHUB_ENV
+          echo 'GOOGLE_SERVICE_ACCOUNT_JSON<<EOF' >> $GITHUB_ENV
+          echo '${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}' >> $GITHUB_ENV
+          echo 'EOF' >> $GITHUB_ENV
       - name: Restore job history cache
         uses: actions/cache@v4
         with:
@@ -64,3 +69,6 @@ jobs:
             logs/
             daily-reports/
           retention-days: 14
+```
+
+Commit it and trigger another run.
